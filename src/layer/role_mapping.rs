@@ -1,6 +1,5 @@
 /// Casbin role mapping layer
 /// TODO: support policy watcher
-
 use casbin::CoreApi;
 use futures::future::BoxFuture;
 use http::{Request, Response, StatusCode};

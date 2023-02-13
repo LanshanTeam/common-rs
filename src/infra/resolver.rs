@@ -3,9 +3,9 @@ use crate::config::ConfigType;
 
 /// The target service type to be resolved by the resolver.
 pub enum Target {
-    REST,  // restful service
-    GRPC,  // grpc service
-    GRAPHQL,  // graphql service
+    REST,    // restful service
+    GRPC,    // grpc service
+    GRAPHQL, // graphql service
 }
 
 pub trait Resolver {

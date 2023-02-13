@@ -1,5 +1,4 @@
 /// TODO move to auth service
-
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 

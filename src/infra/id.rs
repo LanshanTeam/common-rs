@@ -1,7 +1,6 @@
 /// A compact Id deals with string and u64 types
 /// The Id contains a generic type aims to distinguish specified model,
 /// e.p. Id<User>(1) != Id<Product>(1)
-
 use serde::{
     de::{Deserialize, Deserializer},
     ser::{Serialize, Serializer},
