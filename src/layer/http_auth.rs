@@ -1,3 +1,8 @@
+/// Http auth layer which could insert context value into HeaderMap
+/// (It is often used in refreshing token)
+///
+/// Provide an auth backend implement [Auth], [AsyncAuth] for [HttpAuthLayer], [AsyncHttpAuthLayer]
+/// respectively
 use base64::Engine;
 use cookie::{Cookie, CookieJar};
 use futures::future::BoxFuture;

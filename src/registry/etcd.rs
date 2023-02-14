@@ -86,6 +86,8 @@ impl ServiceRegister<String> for EtcdRegistry {
 impl ServiceDiscover<String> for EtcdRegistry {
     type Error = etcd_client::Error;
 
+    //noinspection DuplicatedCode
+    //noinspection DuplicatedCode
     async fn discover_to_channel(
         &self,
         domain: &'static str,
