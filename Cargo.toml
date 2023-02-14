@@ -31,4 +31,5 @@ tokio-util = "0.7"
 tonic = { version = "0.8.3", features = ["transport"] }
 tower = { version = "0.4" }
 tracing = "0.1"
+url = "2.3"
 uuid = { version = "1.2.2", features = ["v4", "fast-rng", "macro-diagnostics", "serde"] }

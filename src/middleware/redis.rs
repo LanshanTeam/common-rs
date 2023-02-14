@@ -9,7 +9,7 @@ define_config! {
     pub RedisConf {
         #[default_dsn = "default_dsn"]
         pub dsn -> String {
-            optional("APP_REDIS", "redis://127.0.0.1/")
+            optional("REDIS_ENDPOINT", "redis://127.0.0.1/")
         }
     }
 }

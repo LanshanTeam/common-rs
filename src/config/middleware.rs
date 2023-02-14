@@ -5,6 +5,7 @@ pub trait MiddlewareConfig {
     type Consul: ConfigType;
     type Apollo: ConfigType;
     type Redis: ConfigType;
+    type RabbitMQ: ConfigType;
 }
 
 impl MiddlewareConfig for Config {
@@ -12,4 +13,5 @@ impl MiddlewareConfig for Config {
     type Consul = crate::middleware::consul::ConsulConf;
     type Apollo = crate::middleware::apollo::ApolloConf;
     type Redis = crate::middleware::redis::RedisConf;
+    type RabbitMQ = crate::middleware::rabbitmq::RabbitMQConf;
 }
