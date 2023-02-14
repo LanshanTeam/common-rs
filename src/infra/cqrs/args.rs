@@ -108,7 +108,7 @@ impl<E, D> Args for Put<D, E> {
 }
 
 // Redis operations arguments
-pub type RedisGet<T, E = GrpcStatus> = Get<&'static redis::Client, T, E>;
-pub type RedisSet<E = GrpcStatus> = Set<&'static redis::Client, E>;
-pub type RedisDel<E = GrpcStatus> = Del<&'static redis::Client, E>;
-pub type RedisPut<E = GrpcStatus> = Put<&'static redis::Client, E>;
+pub type RedisGet<T, E = GrpcStatus> = Get<&'static deadpool_redis::Pool, T, E>;
+pub type RedisSet<E = GrpcStatus> = Set<&'static deadpool_redis::Pool, E>;
+pub type RedisDel<E = GrpcStatus> = Del<&'static deadpool_redis::Pool, E>;
+pub type RedisPut<E = GrpcStatus> = Put<&'static deadpool_redis::Pool, E>;
