@@ -127,15 +127,6 @@ impl<T> UUID<T> {
 }
 
 impl<T> Id<T> {
-    #[allow(clippy::new_without_default)]
-    pub fn new_u64() -> Self {
-        Id::U64(0, PhantomData)
-    }
-    #[allow(clippy::new_without_default)]
-    pub fn new_str() -> Self {
-        Id::Str("".to_string(), PhantomData)
-    }
-
     pub fn as_string(&self) -> String {
         match self {
             Id::Str(id, _) => id.to_owned(),
@@ -154,6 +145,13 @@ impl<T> Id<T> {
         match self {
             Id::Str(id, _) => id.parse::<i64>(),
             Id::U64(id, _) => Ok(id.to_owned() as i64),
+        }
+    }
+
+    pub fn into_string(self) -> String {
+        match self {
+            Id::Str(id, _) => id,
+            Id::U64(id, _) => id.to_string(),
         }
     }
 }

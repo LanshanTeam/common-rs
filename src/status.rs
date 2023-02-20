@@ -632,9 +632,14 @@ pub mod prompt {
 }
 
 pub mod ext {
+    use std::any::{Any, TypeId};
     use super::*;
+    use crate::{debug_expand, internal};
+    use faststr::FastStr;
+    use std::str::FromStr;
     use std::sync::Arc;
     use thiserror::Error;
+    use tonic::Status;
 
     pub trait StatusExt {
         fn add_detail(self, detail: ErrorDetail) -> Self;
@@ -692,8 +697,24 @@ pub mod ext {
         }
     }
 
+    pub trait HttpCodeExt {
+        fn http_code(&self) -> StatusCode;
+    }
+
+    impl<T> HttpCodeExt for Result<T, HttpStatus> {
+        fn http_code(&self) -> StatusCode {
+            match self {
+                Ok(_) => StatusCode::OK,
+                Err(status) => status.code,
+            }
+        }
+    }
+
     #[derive(Serialize, Debug, Error)]
     pub struct HttpStatus {
+        #[serde(skip_serializing_if = "FastStr::is_empty")]
+        message: FastStr,
+        #[serde(skip_serializing_if = "Option::is_none")]
         details: Option<Vec<ErrorDetail>>,
         #[serde(skip)]
         code: StatusCode,
@@ -703,8 +724,9 @@ pub mod ext {
     }
 
     impl HttpStatus {
-        pub fn new(code: StatusCode, details: Option<Vec<ErrorDetail>>) -> Self {
+        pub fn new(code: StatusCode, message: &str, details: Option<Vec<ErrorDetail>>) -> Self {
             Self {
+                message: FastStr::from_str(message).unwrap(),
                 details,
                 code,
                 source: None,
@@ -713,6 +735,7 @@ pub mod ext {
 
         pub fn with_code(code: StatusCode) -> Self {
             Self {
+                message: Default::default(),
                 details: None,
                 code,
                 source: None,
@@ -729,14 +752,22 @@ pub mod ext {
         }
     }
 
-    impl From<tonic::Status> for HttpStatus {
+    impl From<Status> for HttpStatus {
         fn from(value: TonicStatus) -> Self {
+            let http_code = value.code().to_http_code();
+            if http_code < StatusCode::INTERNAL_SERVER_ERROR {
+                return serde_json::from_slice::<Vec<ErrorDetail>>(value.details())
+                    .map(|details: Vec<ErrorDetail>| {
+                        HttpStatus::new(http_code, value.message(), Some(vec![]))
+                            .filter_sensitive_details(details.as_slice())
+                    })
+                    .unwrap_or_else(|_| HttpStatus::new(http_code, value.message(), None));
+            }
             serde_json::from_slice::<Vec<ErrorDetail>>(value.details())
                 .map(|details: Vec<ErrorDetail>| {
-                    HttpStatus::with_code(value.code().to_http_code())
-                        .filter_sensitive_details(details.as_slice())
+                    HttpStatus::with_code(http_code).filter_sensitive_details(details.as_slice())
                 })
-                .unwrap_or_else(|_| HttpStatus::with_code(value.code().to_http_code()))
+                .unwrap_or_else(|_| HttpStatus::with_code(http_code))
         }
     }
 
@@ -774,13 +805,25 @@ pub mod ext {
         }
     }
 
-    impl<T, E> From<Result<T, E>> for Resp<T, E> {
+    impl<T, E> From<Result<T, E>> for Resp<T, E>
+    where
+        T: 'static
+    {
         fn from(value: Result<T, E>) -> Self {
             match value {
-                Ok(data) => Resp {
-                    ok: true,
-                    data: Some(data),
-                    err: None,
+                Ok(data) => {
+                    if data.type_id() == TypeId::of::<()>() {
+                        return Resp {
+                            ok: true,
+                            data: None,
+                            err: None,
+                        }
+                    }
+                    Resp {
+                        ok: true,
+                        data: Some(data),
+                        err: None,
+                    }
                 },
                 Err(err) => Resp {
                     ok: false,
@@ -821,11 +864,27 @@ pub mod ext {
     }
 
     impl<T> Resp<T> {
+        pub fn failed_message(code: StatusCode, message: &str) -> Self {
+            Self {
+                ok: false,
+                data: None,
+                err: Some(HttpStatus::new(code, message, None)),
+            }
+        }
+
         pub fn failed_detail(code: StatusCode, detail: ErrorDetail) -> Self {
             Self {
                 ok: false,
                 data: None,
-                err: Some(HttpStatus::new(code, Some(vec![detail]))),
+                err: Some(HttpStatus::new(code, "", Some(vec![detail]))),
+            }
+        }
+
+        pub fn failed_mess_detail(code: StatusCode, message: &str, detail: ErrorDetail) -> Self {
+            Self {
+                ok: false,
+                data: None,
+                err: Some(HttpStatus::new(code, message, Some(vec![detail]))),
             }
         }
 
@@ -833,7 +892,19 @@ pub mod ext {
             Self {
                 ok: false,
                 data: None,
-                err: Some(HttpStatus::new(code, Some(details))),
+                err: Some(HttpStatus::new(code, "", Some(details))),
+            }
+        }
+
+        pub fn failed_mess_details(
+            code: StatusCode,
+            message: &str,
+            detail: Vec<ErrorDetail>,
+        ) -> Self {
+            Self {
+                ok: false,
+                data: None,
+                err: Some(HttpStatus::new(code, message, Some(detail))),
             }
         }
 
@@ -848,8 +919,33 @@ pub mod ext {
 
     pub type GrpcResult<T> = Result<T, GrpcStatus>;
 
-    /// A wrapper for [tonic::Status] to get a better debug info with error details
+    /// A wrapper for [Status] to get a better debug info with error details
     pub struct GrpcStatus(TonicStatus);
+
+    impl From<diesel::result::Error> for GrpcStatus {
+        fn from(err: diesel::result::Error) -> Self {
+            // You will never handled diesel::result::Error automatically
+            internal!(format!("database error: {}", err)).into()
+        }
+    }
+
+    impl HttpCodeExt for Result<(), TonicStatus> {
+        fn http_code(&self) -> StatusCode {
+            match self {
+                Ok(_) => StatusCode::OK,
+                Err(status) => status.code().to_http_code(),
+            }
+        }
+    }
+
+    impl HttpCodeExt for Result<(), GrpcStatus> {
+        fn http_code(&self) -> StatusCode {
+            match self {
+                Ok(_) => StatusCode::OK,
+                Err(status) => status.code().to_http_code(),
+            }
+        }
+    }
 
     impl Deref for GrpcStatus {
         type Target = TonicStatus;

@@ -156,15 +156,9 @@ pub fn scan_cookies<ReqBody>(req: &Request<ReqBody>) -> CookieJar {
     let mut jar = CookieJar::new();
     req.headers().get(http::header::COOKIE).and_then(|it| {
         it.to_str().ok().map(|cookies| {
-            cookies
-                .split(';')
-                .map(str::trim)
-                .map(Cookie::parse_encoded)
-                .for_each(|cookie| {
-                    if let Ok(cookie) = cookie {
-                        jar.add_original(cookie.into_owned())
-                    }
-                })
+            for cookie in Cookie::split_parse_encoded(cookies).flatten() {
+                jar.add_original(cookie.into_owned())
+            }
         })
     });
     jar
@@ -193,6 +187,7 @@ pub fn scan_basic<B>(req: &Request<B>, auth_header: &str) -> Option<(String, Str
         })
 }
 
+#[inline]
 pub fn write_cookie(res_header: &mut HeaderMap, cookie_jar: &CookieJar) {
     cookie_jar.delta().for_each(|cookie| {
         let cookie = cookie.encoded().to_string();
