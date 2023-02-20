@@ -2,7 +2,7 @@ use crate::config::env::optional;
 use crate::middleware::apollo::{Apollo, ApolloConf};
 use crate::middleware::Middleware;
 use colored::Colorize;
-use kosei::Config;
+use kosei::{Config, ConfigType};
 use serde::Serialize;
 use std::cmp::Ordering;
 use std::path::Path;
@@ -21,10 +21,14 @@ pub async fn parse_config<E: serde::de::DeserializeOwned + Clone>(
             // parse config from directory with service_domain
             if path.is_dir() {
                 let path = path.join(format!("{}.{}", domain, optional("CONFIG_FILETYPE", "yml")));
-                return Ok(Config::<E>::from_file(path).into_inner());
+                if path.exists() {
+                    return Ok(Config::<E>::from_file(path).into_inner());
+                }
             }
-
-            Ok(Config::<E>::from_file(path).into_inner())
+            if path.exists() {
+                return Ok(Config::<E>::from_file(path).into_inner())
+            }
+            Ok(Config::<E>::new("".to_string(), ConfigType::YAML).into_inner())
         }
         "apollo" => {
             let apollo = Apollo::new(ApolloConf::default());

@@ -9,16 +9,9 @@ pub mod service;
 // Root config type
 pub struct Config;
 
-// Prevent users from implementing the ConfigType trait.
-mod private {
-    pub trait Sealed {}
-}
+pub trait ConfigType: Clone + for<'de> serde::de::Deserialize<'de> + Default {}
 
-pub trait ConfigType: private::Sealed {}
-
-impl<T> private::Sealed for T where T: Clone + for<'de> serde::de::Deserialize<'de> + Default {}
-
-impl<T> ConfigType for T where T: private::Sealed {}
+impl<T> ConfigType for T where T: Clone + for<'de> serde::de::Deserialize<'de> + Default {}
 
 // Some useful functions for load string configuration from environment
 pub mod env {

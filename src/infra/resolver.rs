@@ -19,6 +19,10 @@ pub trait Resolver {
     /// Return the reference of the config
     fn conf(&self) -> &Self::Config;
 
+    fn conf_hint() -> Self::Config {
+        Self::Config::default()
+    }
+
     // Resolve a register.
     fn resolve<T>(&self, register: &Register<Self::Config, T>) -> T {
         register.register(self.conf())
