@@ -31,7 +31,7 @@ impl EtcdRegistry {
 impl ServiceRegister<String> for EtcdRegistry {
     type Error = etcd_client::Error;
 
-    async fn register_service(&self, domain: &'static str) -> Result<(), Self::Error> {
+    async fn register_service(&self, service_key: &str) -> Result<(), Self::Error> {
         let (etcd, service, grant_ttl, keep_alive_interval) = match &self.0 {
             EtcdRegistryOption::Register {
                 etcd,
@@ -72,7 +72,7 @@ impl ServiceRegister<String> for EtcdRegistry {
 
         client
             .put(
-                format!("{}:{}", domain, name),
+                format!("{}:{}", service_key, name),
                 discover_addr,
                 Some(PutOptions::new().with_lease(lease_id)),
             )
@@ -90,7 +90,7 @@ impl ServiceDiscover<String> for EtcdRegistry {
     //noinspection DuplicatedCode
     async fn discover_to_channel(
         &self,
-        domain: &'static str,
+        service_key: &str,
         tx: Sender<Change<String, Endpoint>>,
     ) -> Result<(), Self::Error> {
         let etcd_conf = match &self.0 {
@@ -101,7 +101,7 @@ impl ServiceDiscover<String> for EtcdRegistry {
         let mut client = etcd.make_client().await?;
 
         let (mut watcher, mut stream) = client
-            .watch(domain, Some(WatchOptions::new().with_prefix()))
+            .watch(service_key, Some(WatchOptions::new().with_prefix()))
             .await?;
         watcher.request_progress().await.unwrap();
 
@@ -109,13 +109,13 @@ impl ServiceDiscover<String> for EtcdRegistry {
         trace!("create a watch id {}", watch_id);
 
         let res = client
-            .get(domain, Some(GetOptions::new().with_prefix()))
+            .get(service_key, Some(GetOptions::new().with_prefix()))
             .await?;
 
         info!(
             "initial discover {} services from domain '{}'",
             res.count(),
-            domain
+            service_key
         );
 
         for kv in res.kvs() {

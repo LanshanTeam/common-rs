@@ -1,4 +1,5 @@
 use crate::config::env::optional;
+use crate::infra::Resolver;
 use crate::middleware::apollo::{Apollo, ApolloConf};
 use crate::middleware::Middleware;
 use colored::Colorize;
@@ -9,9 +10,7 @@ use std::path::Path;
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 
-pub async fn parse_config<E: serde::de::DeserializeOwned + Clone>(
-    domain: &str,
-) -> Result<E, Error> {
+pub async fn parse_config<R: Resolver>() -> Result<R::Config, Error> {
     let typ = optional("CONFIG_TYPE", "file");
     match typ.to_lowercase().as_str() {
         "file" => {
@@ -20,21 +19,28 @@ pub async fn parse_config<E: serde::de::DeserializeOwned + Clone>(
 
             // parse config from directory with service_domain
             if path.is_dir() {
-                let path = path.join(format!("{}.{}", domain, optional("CONFIG_FILETYPE", "yml")));
+                let path = path.join(format!(
+                    "{}.{}.{}",
+                    R::DOMAIN,
+                    R::TARGET,
+                    optional("CONFIG_FILETYPE", "yml")
+                ));
                 if path.exists() {
-                    return Ok(Config::<E>::from_file(path).into_inner());
+                    return Ok(Config::<R::Config>::from_file(path).into_inner());
                 }
             }
             if path.exists() {
-                return Ok(Config::<E>::from_file(path).into_inner())
+                return Ok(Config::<R::Config>::from_file(path).into_inner());
             }
-            Ok(Config::<E>::new("".to_string(), ConfigType::YAML).into_inner())
+            Ok(Config::<R::Config>::new("".to_string(), ConfigType::YAML).into_inner())
         }
         "apollo" => {
             let apollo = Apollo::new(ApolloConf::default());
             let client = apollo.make_client().await.unwrap();
 
-            Ok(Config::<E>::from_apollo(&client).await?.into_inner())
+            Ok(Config::<R::Config>::from_apollo(&client)
+                .await?
+                .into_inner())
         }
         _ => panic!("unsupported config type"),
     }

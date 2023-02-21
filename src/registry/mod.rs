@@ -19,7 +19,7 @@ where
 {
     type Error;
 
-    async fn register_service(&self, domain: &'static str) -> Result<(), Self::Error>;
+    async fn register_service(&self, service_key: &str) -> Result<(), Self::Error>;
 }
 
 #[async_trait]
@@ -31,7 +31,7 @@ where
 
     async fn discover_to_channel(
         &self,
-        domain: &'static str,
+        service_key: &str,
         tx: Sender<Change<K, Endpoint>>,
     ) -> Result<(), Self::Error>;
 }

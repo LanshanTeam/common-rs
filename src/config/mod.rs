@@ -13,7 +13,8 @@ pub trait ConfigType: Clone + for<'de> serde::de::Deserialize<'de> + Default {}
 
 impl<T> ConfigType for T where T: Clone + for<'de> serde::de::Deserialize<'de> + Default {}
 
-// Some useful functions for load string configuration from environment
+/// Some useful functions for load string configuration from environment.
+/// Info tips when an environment is not found and how to handle it.
 pub mod env {
 
     use super::*;
@@ -49,7 +50,8 @@ pub mod env {
 pub mod register {
     use super::*;
 
-    /// Register grabbed a closure for generating values
+    /// Register grabbed a closure for generating values without
+    /// use static block to define a value.
     /// specify the generic type C with your own config type
     #[derive(Clone)]
     pub struct Register<C: ConfigType, T>(Arc<dyn Fn(&C) -> T + Send + Sync>);
@@ -67,8 +69,8 @@ pub mod register {
         }
 
         /// Use Box::leak to create a 'static lifetime register.
-        /// Used for high performance context, for normal context please use [Register::once]
-        /// Keep in mind that the return type T has been leaked in the memory,
+        /// Used for high performance scenarios, for normal scenarios please use [Register::once]
+        /// Keep in mind that the return type T will be leaked in the memory,
         /// so the size of T should be in a proper range
         pub fn once_ref(f: impl Fn(&C) -> T + Send + Sync + 'static) -> Register<C, &'static T>
         where
@@ -85,6 +87,7 @@ pub mod register {
             Register(Arc::new(f))
         }
 
+        /// Resolve a value
         pub fn register(&self, conf: &C) -> T {
             self.0(conf)
         }

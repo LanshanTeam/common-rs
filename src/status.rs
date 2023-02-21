@@ -632,10 +632,10 @@ pub mod prompt {
 }
 
 pub mod ext {
-    use std::any::{Any, TypeId};
     use super::*;
     use crate::{debug_expand, internal};
     use faststr::FastStr;
+    use std::any::{Any, TypeId};
     use std::str::FromStr;
     use std::sync::Arc;
     use thiserror::Error;
@@ -807,7 +807,7 @@ pub mod ext {
 
     impl<T, E> From<Result<T, E>> for Resp<T, E>
     where
-        T: 'static
+        T: 'static,
     {
         fn from(value: Result<T, E>) -> Self {
             match value {
@@ -817,14 +817,14 @@ pub mod ext {
                             ok: true,
                             data: None,
                             err: None,
-                        }
+                        };
                     }
                     Resp {
                         ok: true,
                         data: Some(data),
                         err: None,
                     }
-                },
+                }
                 Err(err) => Resp {
                     ok: false,
                     data: None,

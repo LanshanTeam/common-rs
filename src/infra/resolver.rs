@@ -1,11 +1,22 @@
 use crate::config::register::Register;
 use crate::config::ConfigType;
+use std::fmt::{Display, Formatter};
 
 /// The target service type to be resolved by the resolver.
 pub enum Target {
     REST,    // restful service
     GRPC,    // grpc service
     GRAPHQL, // graphql service
+}
+
+impl Display for Target {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Target::REST => write!(f, "rest"),
+            Target::GRPC => write!(f, "grpc"),
+            Target::GRAPHQL => write!(f, "graphql"),
+        }
+    }
 }
 
 pub trait Resolver {
@@ -23,7 +34,14 @@ pub trait Resolver {
         Self::Config::default()
     }
 
-    // Resolve a register.
+    /// A service key concat the system domain and exposed api type.
+    /// It needs to be unique in the whole system, so it could be used
+    /// in service register/discover
+    fn service_key() -> String {
+        format!("{}-{}", Self::DOMAIN, Self::TARGET)
+    }
+
+    /// Resolve a register.
     fn resolve<T>(&self, register: &Register<Self::Config, T>) -> T {
         register.register(self.conf())
     }
