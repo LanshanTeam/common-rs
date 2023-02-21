@@ -40,7 +40,7 @@ impl ServiceRegister<String> for EtcdRegistry {
                 keep_alive_interval,
             } => (etcd, service, *grant_ttl, *keep_alive_interval),
             EtcdRegistryOption::Discover { .. } => {
-                panic!("Cannot register service_old with a discover config")
+                panic!("Cannot register service with a discover config")
             }
         };
 
@@ -126,7 +126,7 @@ impl ServiceDiscover<String> for EtcdRegistry {
                 let _ = tx.send(Change::Insert(key.to_string(), endpoint)).await;
             } else {
                 warn!(
-                    "unexpected service_old endpoint {}, cannot parse it to an Endpoint",
+                    "unexpected service endpoint {}, cannot parse it to an Endpoint",
                     value
                 );
             }
@@ -153,23 +153,23 @@ impl ServiceDiscover<String> for EtcdRegistry {
                                 let value = kv.value_str().unwrap();
 
                                 if kv.version() == 1 {
-                                    trace!("discover a new service_old {}: {}", key, value);
+                                    trace!("discover a new service {}: {}", key, value);
                                 } else {
-                                    trace!("service_old {} changed its endpoint to {}", key, value)
+                                    trace!("service {} changed its endpoint to {}", key, value)
                                 }
 
                                 if let Ok(endpoint) = Endpoint::from_str(value) {
                                     let _ =
                                         tx.send(Change::Insert(key.to_string(), endpoint)).await;
                                 } else {
-                                    warn!("unexpected service_old endpoint {}, cannot parse it to an Endpoint", value);
+                                    warn!("unexpected service endpoint {}, cannot parse it to an Endpoint", value);
                                 }
                             }
                         }
                         EventType::Delete => {
                             if let Some(kv) = event.kv() {
                                 let key = kv.key_str().unwrap();
-                                trace!("service_old {} is going down", key);
+                                trace!("service {} is going down", key);
 
                                 let _ = tx.send(Change::Remove(key.to_string())).await;
                             }
@@ -184,15 +184,3 @@ impl ServiceDiscover<String> for EtcdRegistry {
         Ok(())
     }
 }
-
-// #[tokio::test]
-// async fn test_discover() {
-//     tracing_subscriber::fmt::init();
-//     let etcd = EtcdConf::default();
-//     let service_old = ServiceConf::default();
-//     let conf = EtcdRegistryConf::register(etcd, service_old);
-//     let registry = EtcdRegistry::new(conf);
-//     let ok = registry.register_service("sys").await;
-//     println!("{:?}", registry);
-//     println!("{:?}", ok);
-// }
