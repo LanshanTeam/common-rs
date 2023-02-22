@@ -1,8 +1,8 @@
 use crate::config::env::{optional, optional_some, require};
 use crate::define_config;
-use crate::middleware::Middleware;
+use crate::middleware::{parse_config_type, Middleware};
 use async_trait::async_trait;
-use kosei::{ApolloClient, ConfigType};
+use kosei::ApolloClient;
 use serde::Serialize;
 use std::convert::Infallible;
 
@@ -36,14 +36,6 @@ define_config! {
     }
 }
 
-fn parse_config_type(typ: &str) -> ConfigType {
-    match &*typ.to_lowercase() {
-        "toml" => ConfigType::TOML,
-        "json" => ConfigType::JSON,
-        _ => ConfigType::YAML,
-    }
-}
-
 pub struct Apollo(ApolloConf);
 
 impl Apollo {
@@ -59,10 +51,13 @@ impl Middleware for Apollo {
 
     async fn make_client(&self) -> Result<Self::Client, Self::Error> {
         let conf = &self.0;
-        Ok(ApolloClient::new(&conf.addr)
+        let mut client = ApolloClient::new(&conf.addr)
             .appid(&conf.appid)
             .cluster(&conf.cluster_name)
-            .namespace(&conf.namespace, parse_config_type(&conf.config_type))
-            .some_secret(conf.secret.as_deref()))
+            .namespace(&conf.namespace, parse_config_type(&conf.config_type));
+        if let Some(ref secret) = self.0.secret {
+            client = client.secret(secret);
+        }
+        Ok(client)
     }
 }

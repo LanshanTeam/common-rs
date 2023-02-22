@@ -7,6 +7,7 @@ use kosei::{Config, ConfigType};
 use serde::Serialize;
 use std::cmp::Ordering;
 use std::path::Path;
+use crate::middleware::nacos::{Nacos, NacosConf};
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 
@@ -39,6 +40,14 @@ pub async fn parse_config<R: Resolver>() -> Result<R::Config, Error> {
             let client = apollo.make_client().await.unwrap();
 
             Ok(Config::<R::Config>::from_apollo(&client)
+                .await?
+                .into_inner())
+        }
+        "nacos" => {
+            let nacos = Nacos::new(NacosConf::default());
+            let mut client = nacos.make_client().await.unwrap();
+
+            Ok(Config::<R::Config>::from_nacos(&mut client)
                 .await?
                 .into_inner())
         }
