@@ -10,8 +10,10 @@ use tokio::sync::mpsc::Sender;
 use tonic::transport::Endpoint;
 use tower::discover::Change;
 
-/// Domain must be a static str and immutable across runtime.
-/// see [Resolver::DOMAIN]
+/// `service_key` must be unique crossing all service
+/// see [`Resolver::service_key`]
+///
+/// [`Resolver`]: crate::infra::Resolver
 #[async_trait]
 pub trait ServiceRegister<K>
 where

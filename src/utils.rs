@@ -1,13 +1,13 @@
 use crate::config::env::optional;
 use crate::infra::Resolver;
 use crate::middleware::apollo::{Apollo, ApolloConf};
+use crate::middleware::nacos::{Nacos, NacosConf};
 use crate::middleware::Middleware;
 use colored::Colorize;
 use kosei::{Config, ConfigType};
 use serde::Serialize;
 use std::cmp::Ordering;
 use std::path::Path;
-use crate::middleware::nacos::{Nacos, NacosConf};
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 

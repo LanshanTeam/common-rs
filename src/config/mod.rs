@@ -70,8 +70,8 @@ pub mod register {
 
         /// Use Box::leak to create a 'static lifetime register.
         /// Used for high performance scenarios, for normal scenarios please use [Register::once]
-        /// Keep in mind that the return type T will be leaked in the memory,
-        /// so the size of T should be in a proper range
+        /// Keep in mind that the return type T will be leaked in the memory, so
+        /// DO NOT call this in recurrent block.
         pub fn once_ref(f: impl Fn(&C) -> T + Send + Sync + 'static) -> Register<C, &'static T>
         where
             T: Sync + 'static,
@@ -95,6 +95,7 @@ pub mod register {
 }
 
 /// Macro used to define a config
+/// TODO: how to prevent `#[$ff:ident = $ffs:literal] where "$ff" = $ffs` block?
 #[macro_export]
 macro_rules! define_config {
     (

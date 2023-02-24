@@ -1,38 +1,40 @@
-// CQRS
-// From https://github.com/KodrAus/rust-web-app#commands-and-queries
+//! CQRS
+//! From https://github.com/KodrAus/rust-web-app#commands-and-queries
 
-// Defined a CQRS basic model with trait `Command` and `Query`
-// `Command` takes ownerships from types whereas `Query` borrows
-// from types. The commands capture some domain interaction and work
-// directly on entities whereas queries are totally arbitrary.
-// The difference in receivers means commands can call queries
-// but queries can't call commands.
-
-pub mod args;
-
-pub use args::*;
+//! Defined a CQRS basic model with trait [`Command`] and [`Query`]
+//! [`Command`] takes ownerships from types whereas [`Query`] borrows
+//! from types. The commands capture some domain interaction and work
+//! directly on entities whereas queries are totally arbitrary.
+//! The difference in receivers means commands can call queries
+//! but queries can't call commands.
 
 use async_trait::async_trait;
 use std::future::Future;
 
-pub trait Args {
+/// Query arguments
+pub trait QueryArgs {
+    type Output;
+}
+
+/// Command arguments
+pub trait CommandArgs {
     type Output;
 }
 
 #[async_trait]
-pub trait Command<TArgs: Args> {
+pub trait Command<TArgs: CommandArgs> {
     async fn execute(self, input: TArgs) -> TArgs::Output;
 }
 
 #[async_trait]
-pub trait Query<TArgs: Args> {
+pub trait Query<TArgs: QueryArgs> {
     async fn execute(&self, input: TArgs) -> TArgs::Output;
 }
 
 #[async_trait]
 impl<TArgs, TCommand, TFuture> Command<TArgs> for TCommand
 where
-    TArgs: Args + Send + 'static,
+    TArgs: CommandArgs + Send + 'static,
     TCommand: (FnOnce(TArgs) -> TFuture) + Send,
     TFuture: Future<Output = TArgs::Output> + Send,
 {
@@ -44,7 +46,7 @@ where
 #[async_trait]
 impl<TArgs, TQuery, TFuture> Query<TArgs> for TQuery
 where
-    TArgs: Args + Send + 'static,
+    TArgs: QueryArgs + Send + 'static,
     TQuery: (Fn(TArgs) -> TFuture) + Sync,
     TFuture: Future<Output = TArgs::Output> + Send,
 {
@@ -62,11 +64,11 @@ mod tests {
         struct AddValue(i32);
         struct GetLen;
 
-        impl Args for GetLen {
+        impl QueryArgs for GetLen {
             type Output = usize;
         }
 
-        impl Args for AddValue {
+        impl CommandArgs for AddValue {
             type Output = ();
         }
 

@@ -19,6 +19,7 @@ impl Display for Target {
     }
 }
 
+/// Basic abstraction of Resolver
 pub trait Resolver {
     /// The target to be resolved by the resolver.
     const TARGET: Target;
@@ -27,9 +28,10 @@ pub trait Resolver {
     /// The config type hold by the resolver.
     type Config: ConfigType;
 
-    /// Return the reference of the config
+    /// Return the reference of the config hold by the resolver
     fn conf(&self) -> &Self::Config;
 
+    /// config hint used to generate configuration structure
     fn conf_hint() -> Self::Config {
         Self::Config::default()
     }
