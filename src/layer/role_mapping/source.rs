@@ -5,6 +5,7 @@ use redis::Msg;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::sync::mpsc::UnboundedReceiver;
+use tracing::warn;
 
 pub async fn redis_source(
     channel: &str,
@@ -19,10 +20,11 @@ pub async fn redis_source(
     on_msg.map(|msg: Msg| {
         let payload = msg.get_payload_bytes();
         serde_json::from_slice::<EventData>(payload).unwrap_or_else(|_| {
-            panic!(
+            warn!(
                 "Cannot deserialize EventData({}) from redis",
                 String::from_utf8_lossy(payload)
-            )
+            );
+            EventData::NIL
         })
     })
 }
@@ -53,10 +55,11 @@ impl Stream for AMQPSource {
         let msg = ready!(self.rx.poll_recv(cx));
         let data = msg.and_then(|msg| msg.content).map(|content| {
             serde_json::from_slice::<EventData>(content.as_slice()).unwrap_or_else(|_| {
-                panic!(
+                warn!(
                     "Cannot deserialize EventData({}) from rabbitmq",
                     String::from_utf8_lossy(content.as_slice())
-                )
+                );
+                EventData::NIL
             })
         });
         Poll::Ready(data)
