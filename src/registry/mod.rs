@@ -1,10 +1,13 @@
+pub mod consul;
 pub mod etcd;
+
+pub use self::consul::*;
+pub use etcd::*;
 
 use crate::config::service::ServiceConf;
 use crate::middleware::consul::ConsulConf;
 use crate::middleware::etcd::EtcdConf;
 use async_trait::async_trait;
-pub use etcd::*;
 use std::hash::Hash;
 use tokio::sync::mpsc::Sender;
 use tonic::transport::Endpoint;
@@ -15,17 +18,14 @@ use tower::discover::Change;
 ///
 /// [`Resolver`]: crate::infra::Resolver
 #[async_trait]
-pub trait ServiceRegister<K>
-where
-    K: Hash + Eq + Send + Clone + 'static,
-{
+pub trait ServiceRegister {
     type Error;
 
     async fn register_service(&self, service_key: &str) -> Result<(), Self::Error>;
 }
 
 #[async_trait]
-pub trait ServiceDiscover<K>
+pub trait ServiceDiscover<K, V = Endpoint>
 where
     K: Hash + Eq + Send + Clone + 'static,
 {
@@ -34,7 +34,7 @@ where
     async fn discover_to_channel(
         &self,
         service_key: &str,
-        tx: Sender<Change<K, Endpoint>>,
+        tx: Sender<Change<K, V>>,
     ) -> Result<(), Self::Error>;
 }
 
@@ -111,5 +111,15 @@ impl Default for ConsulRegistryOption {
         Self::Discover {
             consul: Default::default(),
         }
+    }
+}
+
+impl ConsulRegistryOption {
+    pub fn discover(consul: ConsulConf) -> Self {
+        Self::Discover { consul }
+    }
+
+    pub fn register(consul: ConsulConf, service: ServiceConf) -> Self {
+        Self::Register { consul, service }
     }
 }

@@ -5,6 +5,7 @@
 /// Initialize this layer with a [Stream] source(Output=[EventData]) additional
 use crate::layer::role_mapping::enforce;
 use casbin::{CoreApi, Event, EventEmitter, MgmtApi};
+use futures::executor::block_on;
 use futures::future::BoxFuture;
 use futures::{Stream, StreamExt};
 use http::{Request, Response};
@@ -14,9 +15,8 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use futures::executor::block_on;
 use tower::{Layer, Service};
-use tracing::{error, Instrument, warn};
+use tracing::{error, trace, warn, Instrument};
 
 #[derive(Clone)]
 pub struct DistributeRoleMappingLayer<I, E> {
@@ -36,7 +36,7 @@ pub enum EventData {
     RemoveGroupingPolicies(Vec<Vec<String>>),
     RemoveFilteredPolicy(usize, Vec<String>),
     RemoveFilteredGroupingPolicy(usize, Vec<String>),
-    NIL,  // remain for failing deserializing event data
+    NIL, // remain for failing deserializing event data
 }
 
 impl EventData {
@@ -93,13 +93,13 @@ fn listen_source<
                 EventData::RemoveFilteredPolicy(i, p) => guard.remove_filtered_policy(i, p).await,
                 EventData::RemoveFilteredGroupingPolicy(i, p) => {
                     guard.remove_filtered_grouping_policy(i, p).await
-                },
+                }
                 _ => Ok(true),
             };
             match res {
                 Ok(false) => warn!("Failed handle event data {:?}", kind),
                 Err(e) => error!("Error handle event data, err: {}", e),
-                _ => {}
+                _ => trace!("Updated enforcer"),
             }
         }
     }
@@ -107,9 +107,8 @@ fn listen_source<
     // spawn and detach the loop thread.
     std::thread::Builder::new()
         .name("casbin event source loop".to_string())
-        .spawn(move || {
-            block_on(listener_loop)
-        }).expect("Cannot create event source loop thread.");
+        .spawn(move || block_on(listener_loop))
+        .expect("Cannot create event source loop thread.");
 }
 
 impl<I, E: CoreApi + EventEmitter<Event> + 'static> DistributeRoleMappingLayer<I, E> {

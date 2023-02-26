@@ -2,7 +2,7 @@ use crate::config::env::{optional, optional_some, require};
 use crate::define_config;
 use crate::middleware::{parse_config_type, Middleware};
 use async_trait::async_trait;
-use kosei::ApolloClient;
+use kosei::apollo::{ApolloClient, Builder};
 use serde::Serialize;
 use std::convert::Infallible;
 
@@ -13,9 +13,9 @@ define_config! {
         pub addr -> String {
             require("APOLLO_ADDR")
         },
-        #[default_appid = "default_appid"]
-        pub appid -> String {
-            require("APOLLO_APPID")
+        #[default_app_id = "default_app_id"]
+        pub app_id -> String {
+            require("APOLLO_APP_ID")
         },
         #[default_namespace = "default_namespace"]
         pub namespace -> String {
@@ -51,13 +51,14 @@ impl Middleware for Apollo {
 
     async fn make_client(&self) -> Result<Self::Client, Self::Error> {
         let conf = &self.0;
-        let mut client = ApolloClient::new(&conf.addr)
-            .appid(&conf.appid)
+        let mut builder = Builder::new()
+            .server_url(&conf.addr)
+            .app_id(&conf.app_id)
             .cluster(&conf.cluster_name)
             .namespace(&conf.namespace, parse_config_type(&conf.config_type));
         if let Some(ref secret) = self.0.secret {
-            client = client.secret(secret);
+            builder = builder.secret(secret);
         }
-        Ok(client)
+        Ok(builder.finish())
     }
 }

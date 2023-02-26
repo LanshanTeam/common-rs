@@ -2,7 +2,7 @@ use crate::config::env::{optional, optional_some, require};
 use crate::define_config;
 use crate::middleware::{parse_config_type, Middleware};
 use async_trait::async_trait;
-use kosei::NacosClient;
+use kosei::nacos::{Builder, NacosClient};
 use serde::Serialize;
 use std::convert::Infallible;
 
@@ -27,12 +27,12 @@ define_config! {
         },
         #[default_credential = "default_credential"]
         pub credential -> Option<[String; 2]> {
-            optional_some("NACOS_USERNAME").map(|v| {
-                v.split(":")
+            optional_some("NACOS_CREDENTIAL").map(|v| {
+                v.split(':')
                     .map(ToOwned::to_owned)
                     .collect::<Vec<_>>()
                     .try_into()
-                    .expect("environment 'NACOS_USERNAME' must be like '[username]:[password]'")
+                    .expect("environment 'NACOS_CREDENTIAL' must be like '[username]:[password]'")
             })
         }
     }
@@ -52,13 +52,14 @@ impl Middleware for Nacos {
     type Error = Infallible;
 
     async fn make_client(&self) -> Result<Self::Client, Self::Error> {
-        let mut client = NacosClient::new(self.0.addr.as_str())
+        let mut builder = Builder::new()
+            .server_url(self.0.addr.as_str())
             .data_id(self.0.data_id.as_str())
             .group(self.0.group.as_str())
             .config_type(parse_config_type(self.0.config_type.as_str()));
         if let Some(ref credential) = self.0.credential {
-            client = client.credential(&credential[0], &credential[1]);
+            builder = builder.credential(&credential[0], &credential[1]);
         }
-        Ok(client)
+        Ok(builder.finish())
     }
 }

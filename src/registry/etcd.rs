@@ -28,7 +28,7 @@ impl EtcdRegistry {
 }
 
 #[async_trait]
-impl ServiceRegister<String> for EtcdRegistry {
+impl ServiceRegister for EtcdRegistry {
     type Error = etcd_client::Error;
 
     async fn register_service(&self, service_key: &str) -> Result<(), Self::Error> {
