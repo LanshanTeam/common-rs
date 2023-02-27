@@ -3,11 +3,14 @@ pub mod etcd;
 
 pub use self::consul::*;
 pub use etcd::*;
+use std::collections::HashMap;
 
 use crate::config::service::ServiceConf;
 use crate::middleware::consul::ConsulConf;
 use crate::middleware::etcd::EtcdConf;
+use ::consul::agent::AgentCheck;
 use async_trait::async_trait;
+use diesel::serialize::IsNull::No;
 use std::hash::Hash;
 use tokio::sync::mpsc::Sender;
 use tonic::transport::Endpoint;
@@ -99,7 +102,13 @@ impl Default for EtcdRegistryOption {
 pub enum ConsulRegistryOption {
     Register {
         consul: ConsulConf,
-        service: ServiceConf,
+        service: Box<ServiceConf>,
+        replace_existing_checks: bool,
+        enable_tag_override: bool,
+        tags: Option<Vec<String>>,
+        meta: Option<HashMap<String, String>>,
+        check: Option<Box<AgentCheck>>,
+        weights: Option<HashMap<String, i32>>,
     },
     Discover {
         consul: ConsulConf,
@@ -120,6 +129,15 @@ impl ConsulRegistryOption {
     }
 
     pub fn register(consul: ConsulConf, service: ServiceConf) -> Self {
-        Self::Register { consul, service }
+        Self::Register {
+            consul,
+            service: Box::new(service),
+            replace_existing_checks: false,
+            enable_tag_override: false,
+            tags: None,
+            meta: None,
+            check: None,
+            weights: None,
+        }
     }
 }
