@@ -27,14 +27,14 @@ use tracing::warn;
 #[derive(Clone)]
 pub struct RoleMappingLayer<I, E> {
     enforcer: Arc<E>,
-    _data: PhantomData<I>,
+    marker: PhantomData<*const I>,
 }
 
 impl<I, E: CoreApi> RoleMappingLayer<I, E> {
     pub fn new(enforcer: E) -> Self {
         Self {
             enforcer: Arc::new(enforcer),
-            _data: PhantomData::default(),
+            marker: PhantomData::default(),
         }
     }
 }
@@ -46,7 +46,7 @@ impl<S, I, E> Layer<S> for RoleMappingLayer<I, E> {
         RoleMapping {
             inner,
             enforcer: self.enforcer.clone(),
-            _data: PhantomData::default(),
+            marker: PhantomData::default(),
         }
     }
 }
@@ -55,7 +55,7 @@ impl<S, I, E> Layer<S> for RoleMappingLayer<I, E> {
 pub struct RoleMapping<S, I, E> {
     inner: S,
     enforcer: Arc<E>,
-    _data: PhantomData<I>,
+    marker: PhantomData<*const I>,
 }
 
 impl<S, I, E, ReqBody, ResBody> Service<Request<ReqBody>> for RoleMapping<S, I, E>

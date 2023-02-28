@@ -1,5 +1,6 @@
 /// Http auth layer which could insert context value into HeaderMap
 /// (It is often used in refreshing token)
+/// For normal use please see [tower_http]
 ///
 /// Provide an auth backend implement [Auth], [AsyncAuth] for [HttpAuthLayer], [AsyncHttpAuthLayer]
 /// respectively
