@@ -10,7 +10,6 @@ use crate::middleware::consul::ConsulConf;
 use crate::middleware::etcd::EtcdConf;
 use ::consul::agent::AgentCheck;
 use async_trait::async_trait;
-use diesel::serialize::IsNull::No;
 use std::hash::Hash;
 use tokio::sync::mpsc::Sender;
 use tonic::transport::Endpoint;
