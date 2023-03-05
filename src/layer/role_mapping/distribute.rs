@@ -3,16 +3,16 @@
 /// Policies are protect by RwLock.
 ///
 /// Initialize this layer with a [Stream] source(Output=[EventData]) additional
-use crate::layer::role_mapping::enforce;
+use async_lock::RwLock;
 use casbin::{CoreApi, Event, EventEmitter, MgmtApi};
-use futures::executor::block_on;
-use futures::future::BoxFuture;
-use futures::{Stream, StreamExt};
-use http::{Request, Response};
-use parking_lot::RwLock;
+use futures::{ready, FutureExt, Stream, StreamExt};
+use http::{Request, Response, StatusCode};
+use pin_project_lite::pin_project;
 use serde::{Deserialize, Serialize};
+use std::future::Future;
 use std::marker::PhantomData;
 use std::ops::Deref;
+use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use tower::{Layer, Service};
@@ -57,18 +57,6 @@ impl EventData {
     }
 }
 
-/// Safety:
-///
-/// Even rwlock guard is hold across await, the loop is only run in a specified thread called
-/// `casbin event source loop`, that will not block the main thread in tokio or result in
-/// deadlock.
-///
-/// Limit:
-///
-/// I enabled the `send_guard` feature in `parking_lock` for spawning thread, which is incompatible
-/// with `deadlock_detection` feature. And `send_guard` feature might be insecure as it allow `!Send`
-/// types like `Rc` protected by parking_lock and allow it's guard to be `Send`.
-#[allow(clippy::await_holding_lock)]
 fn listen_source<
     E: CoreApi + EventEmitter<Event> + Send + Sync + 'static,
     S: Stream<Item = EventData> + Send + 'static,
@@ -79,7 +67,7 @@ fn listen_source<
     let listener_loop = async move {
         tokio::pin!(source);
         while let Some(data) = source.next().await {
-            let mut guard = enforcer.write();
+            let mut guard = enforcer.write().await;
             let kind = data.kind();
             let res = match data {
                 EventData::AddPolicy(p) => guard.add_policy(p).await,
@@ -104,11 +92,8 @@ fn listen_source<
         }
     }
     .in_current_span();
-    // spawn and detach the loop thread.
-    std::thread::Builder::new()
-        .name("casbin event source loop".to_string())
-        .spawn(move || block_on(listener_loop))
-        .expect("Cannot create event source loop thread.");
+    // spawn listener loop
+    tokio::spawn(listener_loop);
 }
 
 impl<I, E: CoreApi + EventEmitter<Event> + 'static> DistributeRoleMappingLayer<I, E> {
@@ -152,15 +137,85 @@ where
 {
     type Response = S::Response;
     type Error = S::Error;
-    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
+    type Future = ResponseFuture<E, S, ReqBody, ResBody, I>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.inner.poll_ready(cx)
     }
 
     fn call(&mut self, req: Request<ReqBody>) -> Self::Future {
-        let guard = self.enforcer.read();
+        // let guard = self.enforcer.read();
+        // let enforcer = guard.deref();
+        // enforce::<_, _, _, _, I>(&mut self.inner, req, enforcer)
+
+        // obj => query path
+        // act => http method
+        // sub => request extension
+        let sub = req
+            .extensions()
+            .get::<I>()
+            .map(|sub| sub.as_ref())
+            .unwrap_or("")
+            .to_string();
+        let obj = req.uri().path().to_string();
+        let act = req.method().to_string();
+        ResponseFuture::<_, S, _, _, I> {
+            enforcer: self.enforcer.clone(),
+            arguments: (sub, obj, act),
+            fut: self.inner.call(req),
+            marker: Default::default(),
+        }
+    }
+}
+
+pin_project! {
+    pub struct ResponseFuture<E, S, ReqBody, ResBody, I>
+    where
+        S: Service<Request<ReqBody>, Response = Response<ResBody>>
+    {
+        enforcer: Arc<RwLock<E>>,
+        #[pin]
+        fut: S::Future,
+        arguments: (String, String, String),
+        marker: PhantomData<*const I>,
+    }
+}
+
+impl<E, S, ReqBody, ResBody, I> Future for ResponseFuture<E, S, ReqBody, ResBody, I>
+where
+    S: Service<Request<ReqBody>, Response = Response<ResBody>> + Send + 'static,
+    S::Future: Send + 'static,
+    I: AsRef<str> + Send + Sync + 'static,
+    ResBody: Default,
+    E: CoreApi,
+{
+    type Output = Result<S::Response, S::Error>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.project();
+        let mut read = this.enforcer.read();
+        let guard = ready!(read.poll_unpin(cx));
         let enforcer = guard.deref();
-        enforce::<_, _, _, _, I>(&mut self.inner, req, enforcer)
+        let arg = this.arguments;
+        match enforcer.enforce((&*arg.0, &*arg.1, &*arg.2)) {
+            Ok(checked) => {
+                if checked {
+                    let output = ready!(this.fut.poll(cx));
+                    Poll::Ready(output)
+                } else {
+                    Poll::Ready(Ok(Response::builder()
+                        .status(StatusCode::FORBIDDEN)
+                        .body(ResBody::default())
+                        .unwrap()))
+                }
+            }
+            Err(err) => {
+                warn!("enforcer is working abnormally, err: {:?}", err);
+                Poll::Ready(Ok(Response::builder()
+                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                    .body(ResBody::default())
+                    .unwrap()))
+            }
+        }
     }
 }
