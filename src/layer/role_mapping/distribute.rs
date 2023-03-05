@@ -136,7 +136,7 @@ where
 {
     type Response = S::Response;
     type Error = S::Error;
-    type Future = ResponseFuture<E, S, ReqBody, ResBody, I>;
+    type Future = ResponseFuture<E, S, ReqBody, ResBody>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.inner.poll_ready(cx)
@@ -154,17 +154,16 @@ where
             .to_string();
         let obj = req.uri().path().to_string();
         let act = req.method().to_string();
-        ResponseFuture::<_, S, _, _, I> {
+        ResponseFuture::<_, S, _, _> {
             enforcer: self.enforcer.clone(),
             arguments: (sub, obj, act),
             fut: self.inner.call(req),
-            marker: PhantomData,
         }
     }
 }
 
 pin_project! {
-    pub struct ResponseFuture<E, S, ReqBody, ResBody, I>
+    pub struct ResponseFuture<E, S, ReqBody, ResBody>
     where
         S: Service<Request<ReqBody>, Response = Response<ResBody>>
     {
@@ -172,15 +171,13 @@ pin_project! {
         #[pin]
         fut: S::Future,
         arguments: (String, String, String),
-        marker: PhantomData<*const I>,
     }
 }
 
-impl<E, S, ReqBody, ResBody, I> Future for ResponseFuture<E, S, ReqBody, ResBody, I>
+impl<E, S, ReqBody, ResBody> Future for ResponseFuture<E, S, ReqBody, ResBody>
 where
     S: Service<Request<ReqBody>, Response = Response<ResBody>> + Send + 'static,
     S::Future: Send + 'static,
-    I: AsRef<str> + Send + Sync + 'static,
     ResBody: Default,
     E: CoreApi,
 {
