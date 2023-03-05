@@ -11,7 +11,6 @@ use pin_project_lite::pin_project;
 use serde::{Deserialize, Serialize};
 use std::future::Future;
 use std::marker::PhantomData;
-use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
@@ -21,7 +20,7 @@ use tracing::{error, trace, warn, Instrument};
 #[derive(Clone)]
 pub struct DistributeRoleMappingLayer<I, E> {
     enforcer: Arc<RwLock<E>>,
-    _data: PhantomData<I>,
+    marker: PhantomData<*const I>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -103,7 +102,7 @@ impl<I, E: CoreApi + EventEmitter<Event> + 'static> DistributeRoleMappingLayer<I
         listen_source(enforcer.clone(), source);
         Self {
             enforcer,
-            _data: PhantomData::default(),
+            marker: PhantomData,
         }
     }
 }
@@ -115,7 +114,7 @@ impl<S, I, E> Layer<S> for DistributeRoleMappingLayer<I, E> {
         DistributeRoleMapping {
             inner,
             enforcer: self.enforcer.clone(),
-            _data: PhantomData,
+            marker: PhantomData,
         }
     }
 }
@@ -124,7 +123,7 @@ impl<S, I, E> Layer<S> for DistributeRoleMappingLayer<I, E> {
 pub struct DistributeRoleMapping<S, I, E> {
     inner: S,
     enforcer: Arc<RwLock<E>>,
-    _data: PhantomData<I>,
+    marker: PhantomData<*const I>,
 }
 
 impl<S, I, E, ReqBody, ResBody> Service<Request<ReqBody>> for DistributeRoleMapping<S, I, E>
@@ -144,10 +143,6 @@ where
     }
 
     fn call(&mut self, req: Request<ReqBody>) -> Self::Future {
-        // let guard = self.enforcer.read();
-        // let enforcer = guard.deref();
-        // enforce::<_, _, _, _, I>(&mut self.inner, req, enforcer)
-
         // obj => query path
         // act => http method
         // sub => request extension
@@ -163,7 +158,7 @@ where
             enforcer: self.enforcer.clone(),
             arguments: (sub, obj, act),
             fut: self.inner.call(req),
-            marker: Default::default(),
+            marker: PhantomData,
         }
     }
 }
@@ -194,8 +189,7 @@ where
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
         let mut read = this.enforcer.read();
-        let guard = ready!(read.poll_unpin(cx));
-        let enforcer = guard.deref();
+        let enforcer = ready!(read.poll_unpin(cx));
         let arg = this.arguments;
         match enforcer.enforce((&*arg.0, &*arg.1, &*arg.2)) {
             Ok(checked) => {
